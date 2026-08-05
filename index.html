@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>是真还是假？——AI换脸识别挑战</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+}
+.container {
+  width: 100%;
+  max-width: 500px;
+  padding: 20px;
+}
+.card {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 30px 24px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+h1 { font-size: 24px; margin-bottom: 12px; color: #a8d8ff; }
+.subtitle { font-size: 13px; color: #8899bb; margin-bottom: 20px; line-height: 1.6; }
+.btn {
+  display: inline-block;
+  padding: 14px 36px;
+  margin: 8px;
+  border-radius: 12px;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+.btn:hover { transform: scale(1.05); }
+.btn:active { transform: scale(0.97); }
+.btn-start {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  font-size: 18px;
+  padding: 16px 50px;
+  margin-top: 20px;
+}
+.btn-real {
+  background: linear-gradient(135deg, #11998e, #38ef7d);
+  color: #000;
+  width: 45%;
+  padding: 16px 0;
+  font-size: 18px;
+}
+.btn-fake {
+  background: linear-gradient(135deg, #eb3349, #f45c43);
+  color: #fff;
+  width: 45%;
+  padding: 16px 0;
+  font-size: 18px;
+}
+.btn-next {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  width: 80%;
+  margin-top: 20px;
+}
+.btn-retry {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  font-size: 18px;
+  padding: 16px 50px;
+}
+.img-box {
+  width: 260px;
+  height: 260px;
+  margin: 0 auto 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 3px solid rgba(255,255,255,0.2);
+}
+.img-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.progress {
+  color: #8899bb;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.feedback {
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 10px;
+  line-height: 1.6;
+  font-size: 14px;
+}
+.feedback.correct { background: rgba(17,153,142,0.3); border: 1px solid #38ef7d; }
+.feedback.wrong { background: rgba(235,51,73,0.3); border: 1px solid #f45c43; }
+.tips-icon { font-size: 32px; margin-bottom: 6px; }
+.result-rank { font-size: 36px; font-weight: bold; margin: 10px 0; color: #ffd700; }
+.result-msg { font-size: 14px; line-height: 1.6; color: #ccc; margin-bottom: 24px; }
+.animate-in { animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div class="container" id="app"></div>
+
+<script>
+const questions = [
+  {
+    img: "images/fake-01.jpg",
+    isAI: true,
+    answer: "AI生成",
+    tip: "<b>皮肤纹理</b>：AI生成人脸的皮肤过于光滑，缺少毛孔和细纹等自然细节。真人皮肤有微小瑕疵和纹理变化。"
+  },
+  {
+    img: "images/real-01.jpg",
+    isAI: false,
+    answer: "真人",
+    tip: "<b>瞳孔形状</b>：AI生成人脸的瞳孔往往是正圆形，而真实人眼的瞳孔有微妙的不规则边缘。这张照片的瞳孔细节很自然。"
+  },
+  {
+    img: "images/fake-02.jpg",
+    isAI: true,
+    answer: "AI生成",
+    tip: "<b>耳廓与发丝</b>：仔细观察耳朵轮廓和头发边缘，AI常在这些区域产生模糊或变形，真人的发丝和耳朵边缘是清晰连贯的。"
+  },
+  {
+    img: "images/real-02.jpg",
+    isAI: false,
+    answer: "真人",
+    tip: "<b>眼神光</b>：真人照片中双眼的反光点（眼神光）位置一致，且形状自然。AI常出现两眼反光不一致的情况。"
+  },
+  {
+    img: "images/fake-03.jpg",
+    isAI: true,
+    answer: "AI生成",
+    tip: "<b>背景异常</b>：AI生成图像的背景常出现物体边缘模糊、直线弯曲或不该存在的奇怪形状。这是生成模型的常见穿帮。"
+  },
+  {
+    img: "images/real-03.jpg",
+    isAI: false,
+    answer: "真人",
+    tip: "<b>牙齿细节</b>：AI生成的牙齿数量、形状常出现异常（如多于正常颗数）。真实人像的牙齿排列虽有差异但符合解剖规律。"
+  },
+  {
+    img: "images/fake-04.jpg",
+    isAI: true,
+    answer: "AI生成",
+    tip: "<b>眼镜反光</b>：戴眼镜的AI生成人脸，两个镜片的反光图案常不一致。真实照片中镜片反光遵守物理光学原理。"
+  },
+  {
+    img: "images/real-04.jpg",
+    isAI: false,
+    answer: "真人",
+    tip: "<b>手指细节</b>：AI对手指关节、指甲形状的还原常有缺陷。这张照片中手指的自然弯曲和指甲细节都很真实。"
+  },
+  {
+    img: "images/fake-05.jpg",
+    isAI: true,
+    answer: "AI生成",
+    tip: "<b>光影矛盾</b>：观察面部光影方向——鼻子阴影和下巴阴影是否指向同一光源方向。AI生成图像中光影常自相矛盾。"
+  },
+  {
+    img: "images/real-05.jpg",
+    isAI: false,
+    answer: "真人",
+    tip: "<b>整体自然感</b>：经过前面9题的训练，你应该能感觉到——真人照片有一种'不完美但合理'的自然感，而AI总是在细节处露出破绽。"
+  }
+];
+
+let current = 0;
+let score = 0;
+let answered = false;
+
+function renderStart() {
+  document.getElementById("app").innerHTML = `
+    <div class="card animate-in">
+      <h1>是真还是假？</h1>
+      <div class="subtitle">
+        2024年，AI换脸诈骗涉案金额超<span style="color:#f45c43">数十亿元</span>。<br>
+        AI生成的"假脸"越来越逼真，<br>你能肉眼分辨出来吗？<br><br>
+        <b>10道挑战题</b>，每题判断"真人"还是"AI生成"。<br>
+        答错也别担心——你会学到最有用的防骗知识。
+      </div>
+      <button class="btn btn-start" onclick="renderQuestion()">开始挑战</button>
+    </div>
+  `;
+}
+
+function renderQuestion() {
+  answered = false;
+  const q = questions[current];
+  document.getElementById("app").innerHTML = `
+    <div class="card animate-in">
+      <div class="progress">第 ${current + 1} / ${questions.length} 题</div>
+      <div class="img-box">
+        <img src="${q.img}" alt="人脸照片" onerror="this.parentElement.innerHTML='<div style=\\'padding:100px 0;color:#888\\'>图片加载中...<br>请将图片放入 images 文件夹</div>'">
+      </div>
+      <div>
+        <button class="btn btn-real" onclick="choose(false)">真人</button>
+        <button class="btn btn-fake" onclick="choose(true)">AI 生成</button>
+      </div>
+    </div>
+  `;
+}
+
+function choose(guessedAI) {
+  if (answered) return;
+  answered = true;
+  const q = questions[current];
+  const correct = (guessedAI === q.isAI);
+  if (correct) score++;
+
+  document.getElementById("app").innerHTML = `
+    <div class="card animate-in">
+      <div class="progress">第 ${current + 1} / ${questions.length} 题</div>
+      <div class="img-box">
+        <img src="${q.img}" alt="人脸照片">
+      </div>
+      <div class="tips-icon">${correct ? "&#9989;" : "&#10060;"}</div>
+      <b>正确答案：${q.answer}</b>
+      <div class="feedback ${correct ? 'correct' : 'wrong'}">${q.tip}</div>
+      <button class="btn btn-next" onclick="nextQuestion()">${current < questions.length - 1 ? '下一题' : '查看成绩'}</button>
+    </div>
+  `;
+}
+
+function nextQuestion() {
+  current++;
+  if (current < questions.length) {
+    renderQuestion();
+  } else {
+    renderResult();
+  }
+}
+
+function renderResult() {
+  let rank, msg;
+  if (score <= 4) { rank = "防骗小白"; msg = "不用灰心！AI换脸确实越来越难以辨认。关键不是\"看\"得出来，而是遇到转账要求时绝不轻信。"; }
+  else if (score <= 7) { rank = "火眼金睛"; msg = "你有不错的辨别能力！但现实中AI换脸诈骗常配合视频通话和声音合成，仍需保持警惕。"; }
+  else { rank = "反诈专家"; msg = "你对AI生成的破绽非常敏感！请把这些知识分享给身边的同学和家人，让更多人远离诈骗。"; }
+
+  document.getElementById("app").innerHTML = `
+    <div class="card animate-in">
+      <h1>挑战结束</h1>
+      <div>你答对了 <b>${score}</b> / ${questions.length} 题</div>
+      <div class="result-rank">${rank}</div>
+      <div class="result-msg">${msg}</div>
+      <p style="color:#a8d8ff;font-size:14px;margin-bottom:12px;">记住：<b>不轻信、不转账、多核实</b><br>反诈专线：<b>96110</b></p>
+      <button class="btn btn-retry" onclick="restart()">再来一次</button>
+    </div>
+  `;
+}
+
+function restart() {
+  current = 0;
+  score = 0;
+  renderStart();
+}
+
+window.onload = function() {
+  renderStart();
+};
+</script>
+</body>
+</html>
